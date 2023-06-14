@@ -4,6 +4,10 @@ terraform {
     helm = {
       source = "hashicorp/helm"
     }
+    kubectl = {
+      source  = "gavinbunney/kubectl"
+      version = ">= 1.7.0"
+    }
   }
 }
 
@@ -25,6 +29,19 @@ variable "admin_password" {}
 module "argocd" {
   source         = "aigisuk/argocd/kubernetes"
   admin_password = var.admin_password
+}
+
+data "kubectl_file_documents" "root-app" {
+  content = file("./root-app.yml")
+}
+
+resource "kubectl_manifest" "root-app" {
+  depends_on = [
+    module.argocd,
+  ]
+  count     = length(data.kubectl_file_documents.root-app.documents)
+  yaml_body = element(data.kubectl_file_documents.root-app.documents, count.index)
+  override_namespace = "argocd"
 }
 
 # terraform destroy doesn't work because I don't know why yet, but you can delete the argo namespace with --force
